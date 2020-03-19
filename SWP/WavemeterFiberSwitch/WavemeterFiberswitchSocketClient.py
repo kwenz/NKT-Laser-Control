@@ -1,24 +1,14 @@
-import sys
-import socket
-import selectors
-import traceback
-import random
-import logging
+from .SocketDeviceClient import *
 
-from .ClientMessage import ClientMessage
-
-class SocketDeviceClient:
-    """
-    SocketDeviceClient template class for easy setup of specific device classes
-    """
-    def __init__(self, host, port, device_name):
+class WavemeterFiberswitchSocketClient:
+    def __init__(self, host, port):
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(False)
         self.sock.connect_ex((host, port))
         self.sel = selectors.DefaultSelector()
-        self.device_name = device_name
+        self.device_name = "WavemeterFiberSwitch"
 
     def _createRequest(self, action, value):
         return dict(
@@ -35,6 +25,7 @@ class SocketDeviceClient:
         message = ClientMessage(self.sel, self.sock, (self.host, self.sock), request)
         events = selectors.EVENT_READ | selectors.EVENT_WRITE
         self.sel.register(self.sock, events, data=message)
+        # logging.warning('send request')
         try:
             while True:
                 events = self.sel.select(timeout=1)
@@ -55,5 +46,10 @@ class SocketDeviceClient:
             message.close()
         finally:
             self.sel.close()
-           
+
             return message.result
+
+    def ReadValue(self):
+        data = self.request('query', 'ReadValue')
+        names = ['seed1', 'seed2', 'cesium']
+        return dict((name, value) for name, value in zip(names, data[1]))

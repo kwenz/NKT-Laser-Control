@@ -7,4 +7,4 @@ application.
 
 from SWP import app
 
-app.run(debug=False,simulate=True)
+app.run(debug=False,simulate=False)

@@ -15,15 +15,16 @@ import os
 from .Config import *
 from .Devices import *
 from .Data_acq import *
-from .Bristol import SocketClientBristol671A
+from .WavemeterFiberSwitch.WavemeterFiberswitchSocketClient import WavemeterFiberswitchSocketClient
 
+from .NetworkIOLocking import *
 
 
 """
-This file contains all GUI classes used in the program. The main class that's first initialized is "GUI" and it 
-creates the root window. Once the object is initialized, it can be run. It then creates a 4-element paned 
+This file contains all GUI classes used in the program. The main class that's first initialized is "GUI" and it
+creates the root window. Once the object is initialized, it can be run. It then creates a 4-element paned
 window: pane 1 is defined by the "LaserConnect" class and contains elements initializing connections with
-the hardware, choosing ports and config files; pane 2 defined by class "LaserControl" containes control for the 
+the hardware, choosing ports and config files; pane 2 defined by class "LaserControl" containes control for the
 NKT Laser (1 tab per laser); pane 3 (class "PlotWindow") containes graphs - error for the master and slave lasers
 and the results of cavity scan; pane 4 is created by class "TransferLock" and containes control of the transfer
 cavity and the fine control of laser frequency.
@@ -55,11 +56,10 @@ class GUI:
 
 		self.root.geometry("1830x1000")
 
-		
 
-		
+
+
 	def run(self,debug=False,simulate=False):
-
 
 		pane=PanedWindow(self.root,sashwidth=5,sashpad=2,sashrelief=GROOVE,bg=bg_color)
 		pane.pack(fill=BOTH, expand=1)
@@ -117,7 +117,7 @@ class GUI:
 		except:
 			pass
 
-			
+
 		if len(self.ld.laser_tabs)>0:
 			for obj in self.ld.laser_tabs:
 				# if obj.laser.is_on():
@@ -133,7 +133,7 @@ class GUI:
 #################################################################################################################
 
 """
-This class controlls the NKT laser through the class "Laser" in file "Devices.py", which uses DLL from the 
+This class controlls the NKT laser through the class "Laser" in file "Devices.py", which uses DLL from the
 company. This class operates using 3 different threads: the first is just the GUI, second one probes a queue
 for updates from the laser regarding its status, power, temperature, wavelength etc. and puts that info on
 GUI, the third one probe queue for commands given to the laser from GUI and executes them.
@@ -142,8 +142,8 @@ GUI, the third one probe queue for commands given to the laser from GUI and exec
 class LaserControl:
 
 	"""
-	The class can be initialized with wavelength that was saved in the configuration file. Then, laser's 
-	wavelength is set to that value. However, if the default configuration file is chosen at the beginning, 
+	The class can be initialized with wavelength that was saved in the configuration file. Then, laser's
+	wavelength is set to that value. However, if the default configuration file is chosen at the beginning,
 	this part of the GUI is loaded without the set wavelength (so the laser will have the setting that it's
 	currently using).
 	"""
@@ -151,7 +151,7 @@ class LaserControl:
 
 	def __init__(self,parent,stat,laser,config_wvl=None):
 
-		self.c=299792.458 
+		self.c=299792.458
 
 		self.parent=parent   #Parent window (panes)
 		self.status=stat     #Some GUI elements in different pane
@@ -159,7 +159,7 @@ class LaserControl:
 
 		if laser.is_on():
 			# laser.emission_off()
-			self._is_on=True	
+			self._is_on=True
 			cv=self.status[0]
 			ov=self.status[1]
 			wv=self.status[2]
@@ -178,10 +178,10 @@ class LaserControl:
 		parent.grid_columnconfigure(0,minsize=5)
 		parent.grid_columnconfigure(2,minsize=10)
 		parent.grid_columnconfigure(4,minsize=5)
-		
+
 		"""
 		Min and max wavelengths depend on the laser model, but for us they're limited by approx. 0.37nm both
-		ways from the central wavelength of 1086.78nm. 
+		ways from the central wavelength of 1086.78nm.
 		"""
 		self.max_wv=self.laser.get_central_wavelength()+0.37
 		self.min_wv=self.laser.get_central_wavelength()-0.37
@@ -190,7 +190,7 @@ class LaserControl:
 
 
 		"""
-		This GUI part divides the pane into frames that contain different categories of elements controlling 
+		This GUI part divides the pane into frames that contain different categories of elements controlling
 		the laser or providing information about it.
 		"""
 
@@ -215,16 +215,16 @@ class LaserControl:
 		Label(self.adjustment_frame,text="Set \u03bb [nm]:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=3,column=1,sticky=W)
 		Label(self.adjustment_frame,text="Set freq. [THz]:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=5,column=1,sticky=W)
 		Label(self.adjustment_frame,text="Move freq. [GHz]:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=9,column=1,sticky=W)
-		
+
 		self.new_freq=StringVar()
 		self.new_wv=StringVar()
 
 		#Traces are added so that the user can either set wavelength or the frequency. Not both at the same time.
-		self.new_wv.trace('w',self.set_wvl_trace) 
+		self.new_wv.trace('w',self.set_wvl_trace)
 		self.new_wv.trace('u',self.set_wvl_trace)
 		self.new_freq.trace('w',self.set_wvl_trace)
 		self.new_freq.trace('u',self.set_wvl_trace)
-		
+
 
 		self.new_wv_entry=Entry(self.adjustment_frame,textvariable=self.new_wv,width=12,bg=entry_bg_color)
 		self.new_wv_entry.grid(row=3,column=3,columnspan=3)
@@ -232,7 +232,7 @@ class LaserControl:
 		self.new_freq_entry.grid(row=5,column=3,columnspan=3)
 
 		"""
-		User can also shift the frequency by 1-10 GHz. By the way, all the frequency adjustment that's done 
+		User can also shift the frequency by 1-10 GHz. By the way, all the frequency adjustment that's done
 		using this part of GUI in fact changes temperature of laser's substrate.
 		"""
 		self.plus1g=Button(self.adjustment_frame,text="+1",width=5,command=lambda: self.move_freq(1),font="Arial 10 bold",bg=button_bg_color,fg=label_fg_color)
@@ -258,7 +258,7 @@ class LaserControl:
 		self.mod_var.set(self.laser.get_modulation_type())
 		self.mod_var.trace('w',self.change_mod)
 
-		
+
 
 		#Subframe - constant settings
 		self.settings_frame=LabelFrame(parent,text="Settings",bg=bg_color,fg=label_fg_color)
@@ -308,7 +308,7 @@ class LaserControl:
 
 		Label(self.readout_frame,text="Actual:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=1,column=3)
 		Label(self.readout_frame,text="Set:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=1,column=5)
-			
+
 		Label(self.readout_frame,text="IR wavelength:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=3,column=1,sticky=W)
 		Label(self.readout_frame,text="IR frequency:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=5,column=1,sticky=W)
 		Label(self.readout_frame,text="UV wavelength:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=7,column=1,sticky=W)
@@ -316,7 +316,7 @@ class LaserControl:
 		Label(self.readout_frame,text="Output:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=11,column=1,sticky=W)
 		Label(self.readout_frame,text="Temperature:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=13,column=1,sticky=W)
 
-		
+
 		self.set_lam=Label(self.readout_frame,text="",font="Arial 10 bold",bg=bg_color,fg=info_color)
 		self.set_lam.grid(row=3,column=5,sticky=E)
 		self.set_freq=Label(self.readout_frame,text="",font="Arial 10 bold",bg=bg_color,fg=info_color)
@@ -350,7 +350,7 @@ class LaserControl:
 		self.set_button=Button(self.parent,text="Set wavelength",width=25,command=self.set_wvl,font="Arial 10 bold",relief=RAISED,bg=button_bg_color,fg=label_fg_color)
 		self.set_button.grid(row=3,column=3,padx=75,sticky=N,pady=10)
 
-		
+
 		"""
 		After all the parts of GUI are initialized, the program collects first information from the laser and
 		updates GUI using obtained information.
@@ -378,7 +378,7 @@ class LaserControl:
 
 		"""
 		After the first update, a few things are created: thread and queue (queues are thread-safe) for commands,
-		Events that work like locks allowing threads to communicate with each other and stop each other. 
+		Events that work like locks allowing threads to communicate with each other and stop each other.
 		"""
 
 		self.is_updating=threading.Event()
@@ -389,7 +389,7 @@ class LaserControl:
 		self.command_thread.daemon=True #It stays open until the program is closed.
 
 		"""
-		After 200ms GUI will run it's updating function, where the updating thread is actually created and started. Here, also the command thread (listener) is started. 
+		After 200ms GUI will run it's updating function, where the updating thread is actually created and started. Here, also the command thread (listener) is started.
 		"""
 		self.parent.after(200,self.update_params)
 		self.command_thread.start()
@@ -402,7 +402,7 @@ class LaserControl:
 	"""
 	The following function runs in the command thread (it's the listener). It checks the queue for functions and
 	their arguments and runs them to communicate with the device. The time.sleep function is added so that the
-	laser can react to the command. 
+	laser can react to the command.
 	"""
 	def execute_commands(self,com_queue):
 		self.no_commands_left.set()
@@ -417,9 +417,9 @@ class LaserControl:
 				if len(items)>1:
 					args=items[1:]
 				else:
-					args=[]	
+					args=[]
 				self.updating_paused.wait()
-				func(*args)	
+				func(*args)
 
 				sleep(0.1)
 				self.updating_paused.clear()
@@ -472,9 +472,9 @@ class LaserControl:
 				self.updating_paused.set()
 
 	"""
-	This function runs every 300ms in the GUI thread and checks the update queue for parameters taken from 
+	This function runs every 300ms in the GUI thread and checks the update queue for parameters taken from
 	the laser and puts them onto GUI. It also checks for errors from the device and puts them in a special
-	window that's in a different pane. 
+	window that's in a different pane.
 	"""
 	def update_labels(self):
 
@@ -520,14 +520,14 @@ class LaserControl:
 	send appropriate commands to the laser through the command queue. In other words, these are the functions
 	that put a laser-manipulation function and its arguments into the queue.
 	"""
-		
+
 	def set_wvl(self):
 
 		if self.new_wv.get()!="":
 			try:
 				wvl=float(self.new_wv.get())
 			except ValueError:
-				return	
+				return
 
 			if wvl<self.min_wv:
 				wvl=self.min_wv
@@ -544,12 +544,12 @@ class LaserControl:
 			self.no_commands_left.clear()
 
 			self.command_queue.put([self.laser.set_wavelength,wvl])
-		
+
 		elif self.new_freq!="":
 			try:
 				freq=float(self.new_freq.get())
 			except ValueError:
-				return	
+				return
 
 			if self.c/freq<self.min_wv:
 				freq=self.c/self.min_wv
@@ -589,9 +589,9 @@ class LaserControl:
 		self.set_frequ.configure(text="{0:.5f}".format(freq*4)+" THz")
 
 		self.no_commands_left.clear()
-		self.command_queue.put([self.laser.move_frequency,val])		
-		
-		
+		self.command_queue.put([self.laser.move_frequency,val])
+
+
 	def change_mod(self,*args):
 
 		new_mod=self.mod_var.get()
@@ -600,14 +600,14 @@ class LaserControl:
 		elif new_mod=="Narrow":
 			self.command_queue.put([self.laser.modulation_type,1])
 
-	
+
 	def turn_on(self,event=None):
 
 		self.no_commands_left.clear()
 
 		self.command_queue.put([self.laser.emission_on])
-		
-		
+
+
 		cv=self.status[0]
 		ov=self.status[1]
 		wv=self.status[2]
@@ -616,7 +616,7 @@ class LaserControl:
 		wv.configure(text="{0:.2f}".format(wvl)+" nm")
 		self.emission_on_button.configure(text="Emission on",fg=on_color,command=self.turn_off,relief=SUNKEN)
 		self._is_on=True
-		
+
 
 	def turn_off(self,event=None):
 
@@ -639,18 +639,20 @@ class LaserControl:
 
 """
 The following class describes the pane that is used to control the transfer cavity. It controls scan parameters,
-locking parameters, lockpoints of the master and slave lasers; allows sweeping the frequency within the ~GHz 
+locking parameters, lockpoints of the master and slave lasers; allows sweeping the frequency within the ~GHz
 range; controlls the lasers and cavity through NI DAQs, and also controlls options associated with the DAQ.
 """
 
 class TransferCavity:
 
 	"""
-	For the initialization we pass the parent frame (panes), the frame where plotting happens, list of laser 
+	For the initialization we pass the parent frame (panes), the frame where plotting happens, list of laser
 	objects and the configuration file in the form of a dictionary.
 	"""
 
 	def __init__(self,parent,plt_frame,lasers,config,simulate):
+		# starting socket server for loggin data from external computers
+		self.networkio = NetworkIOLocking(self, '', 65430)
 
 		#Neighbouring plot frame
 		self.plot_win=plt_frame
@@ -682,6 +684,7 @@ class TransferCavity:
 
 
 		self.lasers=lasers
+
 		if simulate:
 			self.lasers=[2,2]
 
@@ -691,13 +694,13 @@ class TransferCavity:
 
 
 		"""
-		Lock initialization. 
+		Lock initialization.
 		This program can handle one or 2 lasers. The Lock class uses wavelength set on the 	laser as the
 		argument for its initialization.
 		"""
 		if len(lasers)==1:
 			self.lock=Lock([lasers[0].get_set_wavelength()],config)
-			
+
 		else:
 			if not simulate:
 				self.lock=Lock([lasers[0].get_set_wavelength(),lasers[1].get_set_wavelength()],config)
@@ -706,15 +709,15 @@ class TransferCavity:
 
 		self.running=False
 		"""
-		Acquiring data and locking. 
-		This class uses the previously defined lock to initialize. It also uses DAQ tasks that the program 
-		initially crates using "setup_tasks" function. We also pass the config dictionary to this initialization 
+		Acquiring data and locking.
+		This class uses the previously defined lock to initialize. It also uses DAQ tasks that the program
+		initially crates using "setup_tasks" function. We also pass the config dictionary to this initialization
 		procedure.
 
 		"""
 
 		self.transfer_lock=TransferLock(self.lock,setup_tasks(config,len(self.lasers),simulate),config)
-		
+
 		"""
 		Sweep thread.
 		This part of the GUI operates mostly in its own thread. The exception is, however, the frequency sweeps,
@@ -746,7 +749,7 @@ class TransferCavity:
 
 
 
-		#Scan settings subframe. 
+		#Scan settings subframe.
 		self.cavity_window_scan=LabelFrame(self.cavity_window,text="Scan",bg=bg_color,fg=label_fg_color)
 		self.cavity_window_scan.grid(row=1,column=1,sticky=NW)
 
@@ -809,13 +812,13 @@ class TransferCavity:
 		Label(self.cavity_window_lock,text="P gain:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=1,column=1,sticky=W)
 		Label(self.cavity_window_lock,text="I gain:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=3,column=1,sticky=W)
 		Label(self.cavity_window_lock,text="Move lock [ms]:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=9,column=1,sticky=W)
-		
-		#It as allowed to change lock setpoints and P and I gain. 
+
+		#It as allowed to change lock setpoints and P and I gain.
 		self.lck_stp=StringVar()
 		self.P_gain=StringVar()
 		self.I_gain=StringVar()
 
-		
+
 		self.lck_stp_entry=Entry(self.cavity_window_lock,textvariable=self.lck_stp,width=12,bg=entry_bg_color,disabledbackground=button_bg_color)
 		self.lck_stp_entry.grid(row=5,column=3,columnspan=3)
 		self.P_gain_entry=Entry(self.cavity_window_lock,textvariable=self.P_gain,width=12,bg=entry_bg_color,disabledbackground=button_bg_color)
@@ -824,7 +827,7 @@ class TransferCavity:
 		self.I_gain_entry.grid(row=3,column=3,columnspan=3)
 
 
-		#To make manipulation easier, the lockpoint can also be moved in discrete steps. 
+		#To make manipulation easier, the lockpoint can also be moved in discrete steps.
 		self.plus1ms=Button(self.cavity_window_lock,text="+0.5",width=5,command=lambda: self.move_master_lck(0.5),font="Arial 10 bold",bg=button_bg_color,fg=label_fg_color)
 		self.plus1ms.grid(row=7,column=5,sticky=E)
 		self.plus5ms=Button(self.cavity_window_lock,text="+1",width=5,command=lambda: self.move_master_lck(1),font="Arial 10 bold",bg=button_bg_color,fg=label_fg_color)
@@ -900,7 +903,7 @@ class TransferCavity:
 		self.rms_cav=Label(self.cavity_window_readout,text="0", font="Arial 10 bold",fg=num_color,bg=bg_color)
 		self.rms_cav.grid(row=7,column=7,sticky=E)
 
-		
+
 		#Checkbox indicating if the error signal from the cavity should be logged into a file.
 		self.cav_err_log=IntVar()
 		self.cav_err_log.set(0)
@@ -951,7 +954,20 @@ class TransferCavity:
 		Lasers' frame. This one is also divided into subframes. Two of those frames are initialized and created,
 		although if there's only one laser connected, the bottom laser frame will be greyed out.
 		"""
-		self.laser_window=[LabelFrame(parent,text="Laser 1",fg=label_fg_color,bg=bg_color),LabelFrame(parent,text="Laser 2",fg=label_fg_color,bg=bg_color)]
+		if self.lasers[0].get_name()=="" or self.lasers[0].get_name()=="BASIK":
+			l1_name="Laser 1"
+		else:
+			l1_name=self.lasers[0].get_name()
+
+		if len(self.lasers)>1:
+			if self.lasers[1].get_name()=="" or self.lasers[1].get_name()=="BASIK":
+				l2_name="Laser 2"
+			else:
+				l2_name=self.lasers[1].get_name()
+		else:
+			l2_name="Laser 2"
+
+		self.laser_window=[LabelFrame(parent,text=l1_name,fg=label_fg_color,bg=bg_color),LabelFrame(parent,text=l2_name,fg=label_fg_color,bg=bg_color)]
 		self.laser_window[0].grid(row=3,column=1,sticky=W)
 		self.laser_window[1].grid(row=5,column=1,sticky=W)
 
@@ -985,7 +1001,7 @@ class TransferCavity:
 		self.sw_button=[None]*2
 		self.current_deviation=[None]*2
 		self.current_dev_process=[None]*2
-		
+
 		self.set_volt=[None]*2
 		self.new_volt_entry=[None]*2
 		self.new_volt=[StringVar(),StringVar()]
@@ -1029,7 +1045,7 @@ class TransferCavity:
 		self.laser_logging_set=[False,False]
 		self.master_logging_set=False
 		self.log_las_file=[None]*2
-		
+
 
 		self.master_logging_flag=threading.Event()
 		self.slave_logging_flag=[threading.Event(),threading.Event()]
@@ -1061,9 +1077,9 @@ class TransferCavity:
 		if len(self.lasers)>1:
 			self.real_frequency.append(deque(maxlen=1))
 			self.real_frequency[1].append(0)
-		
+
 		#We loop over two lasers. One of them might be just greyed out.
-		for i in range(2):			
+		for i in range(2):
 
 			self.laser_window[i].grid_rowconfigure(0,minsize=5)
 			self.laser_window[i].grid_rowconfigure(2,minsize=5)
@@ -1135,8 +1151,8 @@ class TransferCavity:
 			Label(self.laser_lock[-1],text="P gain:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=1,column=1,sticky=W)
 			Label(self.laser_lock[-1],text="I gain:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=3,column=1,sticky=W)
 			Label(self.laser_lock[-1],text="Move lock [MHz]:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=9,column=1,sticky=W)
-			
-			
+
+
 			self.laser_lsp_entry[i]=Entry(self.laser_lock[-1],textvariable=self.laser_lsp[i],width=12,bg=entry_bg_color,disabledbackground=button_bg_color)
 			self.laser_lsp_entry[i].grid(row=5,column=3,columnspan=3)
 			self.laser_P_entry[i]=Entry(self.laser_lock[-1],textvariable=self.laser_P[i],width=12,bg=entry_bg_color,disabledbackground=button_bg_color)
@@ -1145,7 +1161,7 @@ class TransferCavity:
 			self.laser_I_entry[i].grid(row=3,column=3,columnspan=3)
 
 			"""
-			Buttons below are defined to move the lock in discrete steps. One can pass arguments to commands 
+			Buttons below are defined to move the lock in discrete steps. One can pass arguments to commands
 			attached to Button widget by using "lambda" command in Python.
 			"""
 			self.plus1MHz[i]=Button(self.laser_lock[-1],text="+1",width=5,command=lambda x=i: self.move_slave_lck(1,x),font="Arial 10 bold",fg=label_fg_color,bg=button_bg_color)
@@ -1185,7 +1201,7 @@ class TransferCavity:
 			self.laser_readout[-1].grid_rowconfigure(8,minsize=5)
 			self.laser_readout[-1].grid_rowconfigure(10,minsize=11)
 			self.laser_readout[-1].grid_rowconfigure(12,minsize=8)
-			
+
 
 			Label(self.laser_readout[-1],text="Set freq. [THz]:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=1,column=1,sticky=W)
 			Label(self.laser_readout[-1],text="Adjusted FSR [MHz]:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=3,column=1,sticky=W)
@@ -1199,7 +1215,7 @@ class TransferCavity:
 			Label(self.laser_readout[-1],text="Logging:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=9,column=5,sticky=W)
 
 			#The first option is realized if there is only one laser - the second laser frame has no data.
-			if len(lasers)==1 and i==1: 
+			if len(lasers)==1 and i==1:
 				self.set_lfreq[i]=Label(self.laser_readout[-1],text='', font="Arial 10",fg=num_color,bg=bg_color)
 				self.set_lfreq[i].grid(row=1,column=3,sticky=E)
 				self.adj_fsr[i]=Label(self.laser_readout[-1],text='', font="Arial 10",fg=num_color,bg=bg_color)
@@ -1248,14 +1264,14 @@ class TransferCavity:
 				self.laser_lock_status_cv[i].grid(row=11,column=5,sticky=E)
 				self.laser_lock_status[i]=self.laser_lock_status_cv[i].create_oval(2,2,18,18,fill=off_color)
 
-			
-			#Checkbutton for logging error signal to file. 
+
+			#Checkbutton for logging error signal to file.
 			self.las_err_log[i].set(0)
 			self.las_err_log_check[i]=Checkbutton(self.laser_readout[-1],variable=self.las_err_log[i],bg=bg_color)
 			self.las_err_log_check[i].grid(row=9,column=7,sticky=E)
 
 
-			#Visual indicators. 
+			#Visual indicators.
 			Label(self.laser_readout[-1],text="Lock:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=11,column=1,sticky=W)
 			Label(self.laser_readout[-1],text="Locked:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=11,column=5,sticky=W)
 
@@ -1296,16 +1312,16 @@ class TransferCavity:
 			self.current_dev_process[i].grid(row=5,column=5,sticky=W,padx=330)
 
 
-			#Additional option for directly changing voltage applied to the laser. 
+			#Additional option for directly changing voltage applied to the laser.
 			Label(self.laser_window[i],text="New voltage [V]:",font="Arial 10 bold",fg=label_fg_color,bg=bg_color).grid(row=3,column=5,sticky=W,padx=9)
 
 			self.new_volt_entry[i]=Entry(self.laser_window[i],width=12,textvariable=self.new_volt[i],bg=entry_bg_color,disabledbackground=button_bg_color)
 			self.new_volt_entry[i].grid(row=3,column=5,sticky=W,padx=130)
-			
-			
 
 
-		#Bottom frame 
+
+
+		#Bottom frame
 		self.bottom_frame=Frame(parent,width=950,bg=bg_color)
 		self.bottom_frame.grid(row=7,column=1,sticky=W)
 
@@ -1362,10 +1378,10 @@ class TransferCavity:
 		self.indicator_frame.grid_rowconfigure(2,minsize=2)
 		self.indicator_frame.grid_rowconfigure(4,minsize=2)
 
-		Label(self.indicator_frame,bg=bg_color,fg=inftext_color,text="Laser 1:",font="Arial 20 bold").grid(row=1,column=1)
-		Label(self.indicator_frame,bg=bg_color,fg=inftext_color,text="Laser 2:",font="Arial 20 bold").grid(row=3,column=1)
+		Label(self.indicator_frame,bg=bg_color,fg=inftext_color,text=l1_name+":",font="Arial 20 bold").grid(row=1,column=1)
+		Label(self.indicator_frame,bg=bg_color,fg=inftext_color,text=l2_name+":",font="Arial 20 bold").grid(row=3,column=1)
 
-		
+
 		self.wvl_label1=Label(self.indicator_frame,bg=bg_color,fg=info_color,font="Arial 22 bold",text="")
 		self.wvl_label1.grid(row=1,column=3)
 
@@ -1405,7 +1421,7 @@ class TransferCavity:
 
 
 	"""
-	Next, there are several methods that are used by this class. Appart from the one that controls the frequency 
+	Next, there are several methods that are used by this class. Appart from the one that controls the frequency
 	sweep, they operate in the same thread as the GUI. The first method is command invoke by clicking "Save Config"
 	button. This method first opens the filedialog window askign to choose a file to save to. The window is opened
 	in the "/config" directory inside the directory of the GUI file (so the directory of app's initialization).
@@ -1414,9 +1430,9 @@ class TransferCavity:
 	- DAQ:
 		*name of the device
 	- CAVITY:
-		*how many points are collected to calculate RMS's 
+		*how many points are collected to calculate RMS's
 		*what the RMS is for the cavity below which it is considered locked
-		*criterion for peak finding 
+		*criterion for peak finding
 		*time of the scan (ms)
 		*number of samples per scan
 		*offset of the scan (V)
@@ -1434,7 +1450,7 @@ class TransferCavity:
 		*lockpoint in units of R parameter
 		*lockpoint in MHz units, where 0 MHz corresponds to R=0.5
 		*wavelength to which the NKT laser is set (nm)
-		*criterion for peak finding 
+		*criterion for peak finding
 		*what the RMS is for the laser below which it is considered locked
 		*proportional gain
 		*integral gain
@@ -1458,15 +1474,16 @@ class TransferCavity:
 		wvm_d={"IP":self.host_ip,"Port":self.wvm_port,"Laser1":self.wvm_L1,"Laser2":self.wvm_L2}
 
 		cav_d={"RMS":self.transfer_lock.rms_points,"LockThreshold":self.transfer_lock.master_rms_crit,"PeakCriterion":self.transfer_lock.master_peak_crit,"ScanTime":self.transfer_lock.daq_tasks.ao_scan.scan_time,"ScanSamples":self.transfer_lock.daq_tasks.ao_scan.n_samples,"ScanOffset":self.transfer_lock.daq_tasks.ao_scan.offset,"ScanAmplitude":self.transfer_lock.daq_tasks.ao_scan.amplitude,"PGain":self.lock.prop_gain[0],"IGain":self.lock.int_gain[0],"FSR":self.lock._FSR,"Wavelength":self.lock.get_master_wavelength(),"Lockpoint":self.lock.master_lockpoint,"MinVoltage":self.transfer_lock.daq_tasks.ao_scan.mn_voltage,"MaxVoltage":self.transfer_lock.daq_tasks.ao_scan.mx_voltage,"InputChannel":channel_number(self.transfer_lock.daq_tasks.get_scan_ai_channel()),"OutputChannel":channel_number(self.transfer_lock.daq_tasks.get_scan_ao_channel())}
-		
-		laser1_d={"LockpointR":self.lock.slave_lockpoints[0],"LockpointMHz":self.lock.get_laser_lockpoint(0),"Wavelength":self.lasers[0].get_set_wavelength(),"PeakCriterion":self.transfer_lock.slave_peak_crits[0],"LockThreshold":self.transfer_lock.slave_rms_crits[0],"PGain":self.lock.prop_gain[1],"IGain":self.lock.int_gain[1],"MinVoltage":self.transfer_lock.daq_tasks.ao_laser.mn_voltages[0],"MaxVoltage":self.transfer_lock.daq_tasks.ao_laser.mx_voltages[0],"SetVoltage":self.transfer_lock.daq_tasks.ao_laser.voltages[0],"InputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ai_channel(0)),"OutputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ao_channel(0)),"PowerChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_power_channel(0))}
-		
+
+		laser1_d={"Name":self.lasers[0].get_name(),"LockpointR":self.lock.slave_lockpoints[0],"LockpointMHz":self.lock.get_laser_lockpoint(0),"Wavelength":self.lasers[0].get_set_wavelength(),"PeakCriterion":self.transfer_lock.slave_peak_crits[0],"LockThreshold":self.transfer_lock.slave_rms_crits[0],"PGain":self.lock.prop_gain[1],"IGain":self.lock.int_gain[1],"MinVoltage":self.transfer_lock.daq_tasks.ao_laser.mn_voltages[0],"MaxVoltage":self.transfer_lock.daq_tasks.ao_laser.mx_voltages[0],"SetVoltage":self.transfer_lock.daq_tasks.ao_laser.voltages[0],"InputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ai_channel(0)),"OutputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ao_channel(0)),"PowerChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_power_channel(0))}
+		print(self.lasers[0].get_name())
+		print(laser1_d)
 		if len(self.lasers)>1:
-		
-			laser2_d={"LockpointR":self.lock.slave_lockpoints[1],"LockpointMHz":self.lock.get_laser_lockpoint(1),"Wavelength":self.lasers[1].get_set_wavelength(),"PeakCriterion":self.transfer_lock.slave_peak_crits[1],"LockThreshold":self.transfer_lock.slave_rms_crits[1],"PGain":self.lock.prop_gain[2],"IGain":self.lock.int_gain[2],"MinVoltage":self.transfer_lock.daq_tasks.ao_laser.mn_voltages[1],"MaxVoltage":self.transfer_lock.daq_tasks.ao_laser.mx_voltages[1],"SetVoltage":self.transfer_lock.daq_tasks.ao_laser.voltages[1],"InputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ai_channel(1)),"OutputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ao_channel(1)),"PowerChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_power_channel(1))}
-		
+
+			laser2_d={"Name":self.lasers[1].get_name(),"LockpointR":self.lock.slave_lockpoints[1],"LockpointMHz":self.lock.get_laser_lockpoint(1),"Wavelength":self.lasers[1].get_set_wavelength(),"PeakCriterion":self.transfer_lock.slave_peak_crits[1],"LockThreshold":self.transfer_lock.slave_rms_crits[1],"PGain":self.lock.prop_gain[2],"IGain":self.lock.int_gain[2],"MinVoltage":self.transfer_lock.daq_tasks.ao_laser.mn_voltages[1],"MaxVoltage":self.transfer_lock.daq_tasks.ao_laser.mx_voltages[1],"SetVoltage":self.transfer_lock.daq_tasks.ao_laser.voltages[1],"InputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ai_channel(1)),"OutputChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_ao_channel(1)),"PowerChannel":channel_number(self.transfer_lock.daq_tasks.get_laser_power_channel(1))}
+
 			save_conf(flname,daq_d,wvm_d,cav_d,laser1_d,laser2_d)
-		
+
 		else:
 			save_conf(flname,daq_d,wvm_d,cav_d,laser1_d)
 
@@ -1508,7 +1525,7 @@ class TransferCavity:
 			self.mlog_fl_label.config(text=self.mlog_filename)
 		self.adset_window.focus_force()
 
-	
+
 	def new_laser_logfile(self,ind):
 		flname=filedialog.asksaveasfilename(initialdir = os.path.dirname(os.path.realpath(__file__))+"/logs",title = "Select file",filetypes = (("Log files (.hdf5)","*.hdf5"),))
 
@@ -1523,7 +1540,7 @@ class TransferCavity:
 
 
 	"""
-	The function below opens a separate small window that shows currently used DAQ channels: outputs for cavity 
+	The function below opens a separate small window that shows currently used DAQ channels: outputs for cavity
 	scanning and lasers' piezo control, and inputs taking information from photodetectors for master and slave
 	lasers. The window allows to change these channels.
 	"""
@@ -1577,7 +1594,7 @@ class TransferCavity:
 
 
 
-		#We obtain all the channel names of the channels that are currently in use. 
+		#We obtain all the channel names of the channels that are currently in use.
 		self.new_scan_ao=StringVar()
 		self.new_scan_ao.set(self.transfer_lock.daq_tasks.get_scan_ao_channel())
 		self.new_las1_ao=StringVar()
@@ -1600,7 +1617,7 @@ class TransferCavity:
 		AO_channels=self.transfer_lock.daq_tasks.get_ao_channel_names() #All analog output channels on the device
 		AI_channels=self.transfer_lock.daq_tasks.get_ai_channel_names() #All analog input channels on the device
 
-		#Cavity, lasers and photodetectors can have their channel changed using following option menus. 
+		#Cavity, lasers and photodetectors can have their channel changed using following option menus.
 		self.new_scan_ao_entry=OptionMenu(self.daqset_window,self.new_scan_ao,*AO_channels)
 		self.new_scan_ao_entry.grid(row=3,column=3)
 		self.new_scan_ao_entry.config(bg=button_bg_color,fg=label_fg_color,font="Arial 10 bold",highlightbackground=bg_color,width=13)
@@ -1627,7 +1644,7 @@ class TransferCavity:
 			self.new_las2_p_entry=OptionMenu(self.daqset_window,self.new_las2_p,*AI_channels)
 			self.new_las2_p_entry.grid(row=17,column=3)
 			self.new_las2_p_entry.config(bg=button_bg_color,fg=label_fg_color,font="Arial 10 bold",highlightbackground=bg_color,width=13)
-		
+
 
 		Label(self.daqset_window,text=self.transfer_lock.daq_tasks.get_scan_ao_channel(),font="Arial 10 bold",bg=bg_color,fg=inftext_color).grid(row=3,column=5)
 		Label(self.daqset_window,text=self.transfer_lock.daq_tasks.get_laser_ao_channel(0),font="Arial 10 bold",bg=bg_color,fg=inftext_color).grid(row=5,column=5)
@@ -1663,7 +1680,7 @@ class TransferCavity:
 
 
 	"""
-	Next method opens a separate window that allows to change some settings regarding the cavity, the scan and the 
+	Next method opens a separate window that allows to change some settings regarding the cavity, the scan and the
 	master laser, as well as some miscellaneous criteria.
 	"""
 	def open_cav_settings(self):
@@ -1694,7 +1711,7 @@ class TransferCavity:
 		self.adset_window.grid_rowconfigure(18,minsize=30)
 		self.adset_window.grid_rowconfigure(20,minsize=10)
 
-		#Labels 
+		#Labels
 		Label(self.adset_window,text="Current Settings",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=1,column=5)
 		Label(self.adset_window,text="Cavity FSR [MHz]:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=3,column=1,sticky=W)
 		Label(self.adset_window,text="Cavity min. voltage [V]:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=5,column=1,sticky=W)
@@ -1871,7 +1888,7 @@ class TransferCavity:
 		self.adset_window.grid_rowconfigure(10,minsize=30)
 		self.adset_window.grid_rowconfigure(12,minsize=10)
 
-		#Labels 
+		#Labels
 		Label(self.adset_window,text="Current Settings",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=1,column=5)
 		Label(self.adset_window,text="IP address (IPv4):",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=3,column=1,sticky=W)
 		Label(self.adset_window,text="Port:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color).grid(row=5,column=1,sticky=W)
@@ -1901,7 +1918,7 @@ class TransferCavity:
 		Label(self.adset_window,text=str(self.wvm_port),font="Arial 10 bold",bg=bg_color,fg=inftext_color).grid(row=5,column=5,sticky=E)
 		Label(self.adset_window,text=self.wvm_L1,font="Arial 10 bold",bg=bg_color,fg=inftext_color).grid(row=7,column=5,sticky=E)
 		Label(self.adset_window,text=self.wvm_L2,font="Arial 10 bold",bg=bg_color,fg=inftext_color).grid(row=9,column=5,sticky=E)
-		
+
 
 		#Small frame for the buttons (Update,Cancel,Default)
 		self.button_frame=Frame(self.adset_window,bg=bg_color)
@@ -1924,7 +1941,7 @@ class TransferCavity:
 			self.adset_window.destroy()
 			self.adset_window=None
 
-	
+
 	#Function that destroys the channel selection window if Cancel button is clicked (or Esc key)
 	def cancel_daqtop(self,event=None):
 		if self.daqset_window is not None:
@@ -1933,7 +1950,7 @@ class TransferCavity:
 
 
 	def restart_wvm_update(self):
-		
+
 		if self.adset_window is not None:
 			if self.wavemeter_updates:
 				self.wavemeter_updates=False
@@ -1944,14 +1961,14 @@ class TransferCavity:
 					self.host_ip=self.new_ip.get()
 			except:
 				pass
-						
+
 			try:
 				p=int(self.new_port.get())
 				if p>1:
 					self.wvm_port=p
 			except ValueError:
 				pass
-			
+
 			if self.wvm_l1_dict.get()!="":
 				self.wvm_L1=self.wvm_l1_dict.get()
 
@@ -1963,17 +1980,14 @@ class TransferCavity:
 			self.adset_window=None
 
 			try:
-				sdc=SocketClientBristol671A.SocketClientBristol671A(self.host_ip,self.wvm_port) 
+				sdc= WavemeterFiberswitchSocketClient(self.host_ip,self.wvm_port)
 				f=sdc.ReadValue()
 				if not isinstance(f, list):
 					raise Exception('Server at provided IP did not return a list.')
-				else:
-					if not isinstance(f[1],dict):
-						raise Exception('Server at provided IP did not return a dictionary inside the list.')
 			except Exception as e:
 				self.IP_label.config(text=self.host_ip,fg=off_color)
 				self.port_label.config(text=self.wvm_port,fg=off_color)
-				raise e
+				# raise e
 			else:
 				self.update_wavemeter_data_thread=threading.Thread(target=self.update_wvm_data)
 				self.IP_label.config(text=self.host_ip,fg=on_color)
@@ -1992,12 +2006,12 @@ class TransferCavity:
 				self.lock.set_FSR(fsr)
 			except ValueError:
 				fsr=None
-						
+
 			try:
 				mnv=float(self.new_minV.get())
 			except ValueError:
 				mnv=None
-						
+
 			try:
 				mxv=float(self.new_maxV.get())
 			except ValueError:
@@ -2037,7 +2051,7 @@ class TransferCavity:
 				pass
 
 			"""
-			If certain parameters are changed, we also need to update parameters related to the lasers, such as 
+			If certain parameters are changed, we also need to update parameters related to the lasers, such as
 			the adjusted FSR, and lockpoints.
 			"""
 			if mwv is not None or fsr is not None:
@@ -2061,7 +2075,7 @@ class TransferCavity:
 				mnv=float(self.new_minV.get())
 			except ValueError:
 				mnv=None
-						
+
 			try:
 				mxv=float(self.new_maxV.get())
 			except ValueError:
@@ -2130,13 +2144,19 @@ class TransferCavity:
 			if len(Chs)!=len(set(Chs)):
 				raise Exception("Cannot use same channel for two devices.") #This will be caught by GUI logger.
 			else:
-				self.transfer_lock.daq_tasks.update_tasks([sc_ao,l1_ao,l2_ao],[m_ai,l1_ai,l2_ai],[l1_p,l2_p])
+				try:
+					self.transfer_lock.daq_tasks.update_tasks([sc_ao,l1_ao,l2_ao],[m_ai,l1_ai,l2_ai],[l1_p,l2_p])
+				except:
+					pass
 
 		else:
 			if len(Chs)!=len(set(Chs)):
 				raise Exception("Cannot use same channel for two devices.")
 			else:
-				self.transfer_lock.daq_tasks.update_tasks([sc_ao,l1_ao],[m_ai,l1_ai],[l1_p])
+				try:
+					self.transfer_lock.daq_tasks.update_tasks([sc_ao,l1_ao],[m_ai,l1_ai],[l1_p])
+				except:
+					pass
 
 		#The window is destroyed at the end.
 		self.cancel_daqtop()
@@ -2151,7 +2171,7 @@ class TransferCavity:
 		self.cancel_daqtop()
 
 
-	#Analogical method for the cavity/scan settings. 
+	#Analogical method for the cavity/scan settings.
 	def default_adset(self):
 		if self.adset_window is not None:
 			self.lock.set_FSR(1000*float(self.default_cfg['CAVITY']['FSR']))
@@ -2178,7 +2198,7 @@ class TransferCavity:
 
 
 	"""
-	The method below updates scan parameters that are accessible from the main GUI. Most of them (apart from the 
+	The method below updates scan parameters that are accessible from the main GUI. Most of them (apart from the
 	offset) can be accessed only if the scan is not running
 	"""
 	def update_scan_parameters(self):
@@ -2186,24 +2206,24 @@ class TransferCavity:
 		change=False
 
 		try:
-			sc_off=float(self.scan_off.get())		
+			sc_off=float(self.scan_off.get())
 			change=True
 		except ValueError:
 			sc_off=self.transfer_lock.daq_tasks.ao_scan.offset
-				
+
 		try:
 			sc_a=float(self.scan_amp.get())
 			change=True
 		except ValueError:
 			sc_a=self.transfer_lock.daq_tasks.ao_scan.amplitude
-				
+
 		try:
 			sc_samp=float(self.samp_scan.get())
 			change=True
 			self.real_samp.config(text='{:.0f}'.format(sc_samp))
 		except ValueError:
 			sc_samp=self.transfer_lock.daq_tasks.ao_scan.n_samples
-			
+
 		try:
 			sc_t=float(self.scan_t.get())
 			change=True
@@ -2216,7 +2236,7 @@ class TransferCavity:
 			self.real_scoff.config(text='{:.2f}'.format(self.transfer_lock.daq_tasks.ao_scan.offset))
 			self.real_scst.config(text='{:.1f}'.format(1000*self.transfer_lock.daq_tasks.ao_scan.scan_step))
 			self.real_scamp.config(text='{:.2f}'.format(self.transfer_lock.daq_tasks.ao_scan.amplitude))
-	
+
 
 	#Special function for setting scan offset only.
 	def set_scan_offset(self):
@@ -2245,7 +2265,7 @@ class TransferCavity:
 	def move_slave_lck(self,num,ind):
 		if self.lock is not None:
 			self.lock.move_laser_lockpoint(num,ind)
-			self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+			self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 			self.laser_r_lckp[ind].config(text="{:.3f}".format(self.lock.slave_lockpoints[ind]))
 
 
@@ -2253,7 +2273,7 @@ class TransferCavity:
 	def engage_cavity_lock(self):
 
 		if self.running:
-			
+
 			self.cav_err_log_check.config(state="disabled")
 
 			self.cav_lock_state.config(text="Engaged",fg=on_color)
@@ -2288,9 +2308,9 @@ class TransferCavity:
 
 				self.master_logging_set=True
 
-		
 
-	#Method engaging lock for the slave laser. Possible only, if the cavity lock is already engaged. 
+
+	#Method engaging lock for the slave laser. Possible only, if the cavity lock is already engaged.
 	def engage_laser_lock(self,ind,sweep=False):
 
 		if self.running and self.transfer_lock.master_lock_engaged:
@@ -2321,12 +2341,12 @@ class TransferCavity:
 			if self.las_err_log[ind].get():
 
 				if self.laslog_filenames[ind] is None:
-					self.laslog_filenames[ind]=self.laslog_default_directories[ind]+"logS"+datetime.datetime.fromtimestamp(time()).strftime('-%Y-%m-%d-%H.%M.%S')+".hdf5"
+					self.laslog_filenames[ind]=self.laslog_default_directories[ind]+"logS"+str(ind)+"_"+datetime.datetime.fromtimestamp(time()).strftime('-%Y-%m-%d-%H.%M.%S')+".hdf5"
 
 				with h5py.File(self.laslog_filenames[ind],'a') as f:
 					if not self.simulate:
 						f.attrs['SetFrequency']=self.lasers[ind].get_set_frequency()
-				
+
 					f.create_dataset('Errors',(1,),maxshape=(None,),dtype='float32')
 					f.create_dataset('Time',(1,),maxshape=(None,),dtype='float32')
 					f.create_dataset('RealFrequency',(1,),maxshape=(None,),dtype='float32')
@@ -2336,7 +2356,7 @@ class TransferCavity:
 					f.create_dataset('Power',(1,),maxshape=(None,),dtype='float32')
 					f.create_dataset('WvmFrequency',(1,),maxshape=(None,),dtype='float64')
 
-				
+
 				self.slave_err_temp[ind]=queue.Queue()
 				self.slave_time_temp[ind]=queue.Queue()
 				self.slave_rfreq_temp[ind]=queue.Queue()
@@ -2345,7 +2365,7 @@ class TransferCavity:
 				self.slave_lr_temp[ind]=queue.Queue()
 				self.slave_pow_temp[ind]=queue.Queue()
 				self.slave_wvmfreq_temp[ind]=queue.Queue()
-				
+
 				self.lt_start[ind]=time()
 
 				self.transfer_lock._slave_counters[ind]=0
@@ -2374,7 +2394,7 @@ class TransferCavity:
 
 	"""
 	Method called when cavity's lock is being disengaged. Note, that at the end it also automatically
-	disengages slave laser locks. 
+	disengages slave laser locks.
 	"""
 	def disengage_cavity_lock(self):
 
@@ -2386,7 +2406,7 @@ class TransferCavity:
 		self.cav_lock_state.config(text="Disengaged",fg=off_color)
 		self.engage_lock_button.config(text="Engage Lock",command=self.engage_cavity_lock)
 
-		
+
 		#Some parameters are reset
 		self.transfer_lock.master_err_history=deque(maxlen=self.transfer_lock._err_data_length)
 		self.transfer_lock.master_err_history.append(0)
@@ -2412,7 +2432,7 @@ class TransferCavity:
 				else:
 					f['Errors'].resize(dataset_length+queue_length,axis=0)
 					f['Time'].resize(dataset_length+queue_length,axis=0)
-				
+
 				f['Errors'][-queue_length:]=list(self.master_error_temp.queue)
 				f['Time'][-queue_length:]=list(self.master_time_temp.queue)
 
@@ -2423,7 +2443,7 @@ class TransferCavity:
 					pass
 
 
-		
+
 		sleep(0.01)
 
 		self.twopeak_status_cv.itemconfig(self.twopeak_status,fill=off_color)
@@ -2524,17 +2544,19 @@ class TransferCavity:
 				except:
 					pass
 
+		self.laslog_filenames[ind] = None
+
 
 
 	"""
 	First function that is called when laser is swept. The sweep is operated in a separate thread and this function
-	creates this thread (if previously used) and starts it running the sweep function. The thread is not daemon, so 
-	it stops once the function is finished. Can only be called if the cavity lock is engaged. 
+	creates this thread (if previously used) and starts it running the sweep function. The thread is not daemon, so
+	it stops once the function is finished. Can only be called if the cavity lock is engaged.
 	"""
 	def sweep_laser_th(self,ind):
 		if self.transfer_lock.master_lock_engaged:
 			self.discr_sweep_running[ind]=True
-			
+
 			try:
 				self.sweep_thread[ind].start()
 			except RuntimeError:
@@ -2571,12 +2593,12 @@ class TransferCavity:
 				swstart=float(self.sweep_start[ind].get())
 			except ValueError:
 				return
-						
+
 			try:
 				swstop=float(self.sweep_stop[ind].get())
 			except ValueError:
 				return
-			
+
 			if swstart==swstop:
 				return
 
@@ -2655,7 +2677,7 @@ class TransferCavity:
 				self.lock.set_laser_lockpoint(fr,ind)
 				self.current_deviation[ind].config(text="{:.3f}".format(fr)+" MHz")
 				self.current_dev_process[ind].config(text="Locking...")
-				self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+				self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 				self.laser_r_lckp[ind].config(text='{:.3f}'.format(self.lock.slave_lockpoints[ind]))
 
 				self.transfer_lock.slave_locked_flags[ind].wait(60)
@@ -2721,13 +2743,13 @@ class TransferCavity:
 
 
 			self.sw_button[ind].config(text="Sweep",command=lambda: self.sweep_laser_th(ind),state="normal")
-			
+
 			self.sw_pr_var[ind].set(0)
-			
+
 			self.current_deviation[ind].config(text="")
 			self.current_dev_process[ind].config(text="")
 
-	
+
 	#Method invoked when user wants to stop frequency scan
 	def stop_sweep(self,ind):
 		self.sw_button[ind].config(text="Stopping...",state="disabled")
@@ -2748,12 +2770,12 @@ class TransferCavity:
 				swstart=float(self.sweep_start[ind].get())
 			except ValueError:
 				return
-						
+
 			try:
 				swstop=float(self.sweep_stop[ind].get())
 			except ValueError:
 				return
-			
+
 			if swstart==swstop:
 				return
 
@@ -2764,7 +2786,7 @@ class TransferCavity:
 			swspd=self.sweep_speed[ind].get()
 			wait=max(50,2*self.transfer_lock.daq_tasks.ao_scan.scan_time)/1000 #Wait time in seconds
 			step=swspd*wait
-			
+
 			interval=abs(swstop-swstart)
 			current=swstart
 
@@ -2807,7 +2829,7 @@ class TransferCavity:
 
 
 			self.lock.set_laser_lockpoint(swstart,ind)
-			self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+			self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 			self.laser_r_lckp[ind].config(text='{:.3f}'.format(self.lock.slave_lockpoints[ind]))
 
 			#Engaging the lock
@@ -2825,7 +2847,7 @@ class TransferCavity:
 						current=upper_bound
 						self.lock.set_laser_lockpoint(upper_bound,ind)
 						self.current_deviation[ind].config(text="{:.3f}".format(current)+" MHz")
-						self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+						self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 						self.laser_r_lckp[ind].config(text='{:.3f}'.format(self.lock.slave_lockpoints[ind]))
 						self.sw_pr_var[ind].set((current-lower_bound)/interval*100)
 						self.transfer_lock.slave_locked_flags[ind].clear()
@@ -2843,7 +2865,7 @@ class TransferCavity:
 						current=lower_bound
 						self.lock.set_laser_lockpoint(lower_bound,ind)
 						self.current_deviation[ind].config(text="{:.3f}".format(current)+" MHz")
-						self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+						self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 						self.laser_r_lckp[ind].config(text='{:.3f}'.format(self.lock.slave_lockpoints[ind]))
 						self.sw_pr_var[ind].set((current-lower_bound)/interval*100)
 						self.transfer_lock.slave_locked_flags[ind].clear()
@@ -2857,13 +2879,13 @@ class TransferCavity:
 
 
 				self.current_deviation[ind].config(text="{:.3f}".format(current)+" MHz")
-				self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+				self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 				self.laser_r_lckp[ind].config(text='{:.3f}'.format(self.lock.slave_lockpoints[ind]))
 				self.sw_pr_var[ind].set((current-lower_bound)/interval*100)
 
 				sleep(wait)
 
-				
+
 			#Disengage the lock when finished
 			self.disengage_laser_lock(ind,sweep=True)
 
@@ -2918,13 +2940,13 @@ class TransferCavity:
 
 
 			self.sw_button[ind].config(text="Sweep",command=lambda: self.conitnuous_sweep_th(ind),state="normal")
-			
+
 			self.sw_pr_var[ind].set(0)
-			
+
 			self.current_deviation[ind].config(text="")
 			self.current_dev_process[ind].config(text="")
 
-	
+
 	#Method invoked when user wants to stop frequency scan
 	def stop_cont_sweep(self,ind):
 		self.sw_button[ind].config(text="Stopping...",state="disabled")
@@ -2940,21 +2962,18 @@ class TransferCavity:
 		self.wvm_port=int(self.default_cfg['WAVEMETER']['Port'])
 		self.wvm_L1=self.default_cfg['WAVEMETER']['Laser1']
 		self.wvm_L2=self.default_cfg['WAVEMETER']['Laser2']
-		
+
 		try:
-			sdc=SocketClientBristol671A.SocketClientBristol671A(self.host_ip,self.wvm_port) 
+			sdc=WavemeterFiberswitchSocketClient(self.host_ip,self.wvm_port)
 			f=sdc.ReadValue()
 
 			if not isinstance(f, list):
 				if not isinstance(f,dict):
 					raise Exception('Server at provided IP returned wrong format.')
-			else:
-				if not isinstance(f[1],dict):
-					raise Exception('Server at provided IP did not return a dictionary inside the list.')
 		except Exception as e:
 			self.IP_label.config(text=self.host_ip,fg=off_color)
 			self.port_label.config(text=self.wvm_port,fg=off_color)
-			raise e
+			# raise e
 		else:
 			self.update_wavemeter_data_thread=threading.Thread(target=self.update_wvm_data)
 			self.IP_label.config(text=self.host_ip,fg=on_color)
@@ -2963,28 +2982,33 @@ class TransferCavity:
 			self.wavemeter_upd_finished=Event()
 			self.update_wavemeter_data_thread.start()
 
+		if self.adset_window is not None:
+			self.adset_window.destroy()
+			self.adset_window=None
+
+
+
 
 	def update_wvm_data(self):
 
 		c=299792.458
-		
+
 		while self.wavemeter_updates:
 
-			sdc=SocketClientBristol671A.SocketClientBristol671A(self.host_ip,self.wvm_port)
+			sdc=WavemeterFiberswitchSocketClient(self.host_ip,self.wvm_port)
 
 			try:
 				f_dict=sdc.ReadValue()
 				if not isinstance(f_dict,dict):
 					f_dict=f_dict[1]
-				
+
 			except Exception as e:
 				self.IP_label.config(text=self.host_ip,fg=off_color)
 				self.port_label.config(text=self.wvm_port,fg=off_color)
 				raise e
 				break
 			else:
-				self.real_frequency[0].append(f_dict[self.wvm_L1][1])
-
+				self.real_frequency[0].append(f_dict[self.wvm_L1])
 				wvm1=c/self.real_frequency[0][0]
 				if wvm1<1 or wvm1>100000:
 					wvm1=0
@@ -2996,7 +3020,7 @@ class TransferCavity:
 					p1=0
 
 				if len(self.lasers)>1 and len(list(f_dict.keys()))>1:
-					self.real_frequency[1].append(f_dict[self.wvm_L2][1])
+					self.real_frequency[1].append(f_dict[self.wvm_L2])
 					wvm2=c/self.real_frequency[1][0]
 					if wvm2<1 or wvm2>100000:
 						wvm2=0
@@ -3010,7 +3034,7 @@ class TransferCavity:
 				self.wvl_label1.config(text="{:.5f}".format(wvm1)+" nm")
 				self.fr_label1.config(text="{:.6f}".format(self.real_frequency[0][0])+" THz")
 				self.power_label1.config(text="{:.2f}".format(p1)+" mV")
-				
+
 				if len(self.lasers)>1 and len(list(f_dict.keys()))>1:
 					self.wvl_label2.config(text="{:.5f}".format(wvm2)+" nm")
 					self.fr_label2.config(text="{:.6f}".format(self.real_frequency[1][0])+" THz")
@@ -3034,8 +3058,8 @@ class TransferCavity:
 		except ValueError:
 			pass
 
-	
-	#Method called when "Update Lock" button is clicked for the cavity. 
+
+	#Method called when "Update Lock" button is clicked for the cavity.
 	def update_master_lock(self):
 
 		try:
@@ -3044,14 +3068,14 @@ class TransferCavity:
 			self.real_pg.config(text='{:.3f}'.format(pg))
 		except ValueError:
 			pass
-					
+
 		try:
 			ig=float(self.I_gain.get())
 			self.lock.int_gain[0]=ig
 			self.real_ig.config(text='{:.3f}'.format(ig))
 		except ValueError:
 			pass
-					
+
 		try:
 			stp=float(self.lck_stp.get())
 			self.lock.set_master_lockpoint(stp)
@@ -3069,24 +3093,24 @@ class TransferCavity:
 			self.laser_pg[ind].config(text='{:.3f}'.format(pg))
 		except ValueError:
 			pass
-					
+
 		try:
 			ig=float(self.laser_I[ind].get())
 			self.lock.int_gain[ind+1]=ig
 			self.laser_ig[ind].config(text='{:.3f}'.format(ig))
 		except ValueError:
 			pass
-					
+
 		try:
 			stp=float(self.laser_lsp[ind].get())
 			self.lock.set_laser_lockpoint(stp,ind)
-			self.laser_lckp[ind].config(text='{:.0f}'.format(-self.lock.get_laser_lockpoint(ind)))
+			self.laser_lckp[ind].config(text='{:.0f}'.format(self.lock.get_laser_lockpoint(ind)))
 			self.laser_r_lckp[ind].config(text='{:.3f}'.format(self.lock.slave_lockpoints[ind]))
 		except ValueError:
 			pass
 
 
-	#Method that begins the scan. The scan happenes in a separate thread and this function creates it and starts it.	
+	#Method that begins the scan. The scan happenes in a separate thread and this function creates it and starts it.
 	def start_scanning(self):
 
 		#Disablign some buttons and entry fields
@@ -3100,16 +3124,16 @@ class TransferCavity:
 		self.cav_settings.config(state="disabled")
 		self.change_channels.config(state="disabled")
 		self.save_configuration.config(state="disabled")
-		
+
 		#Changing flags
 		self.transfer_lock.start_scan()
 		self.run_scan.configure(text="Stop Scanning",command=self.stop_scanning,fg=off_color)
 		self.running=True
-		
+
 
 		"""
-		Creating threads. The function responsible for scanning and acquiring data obtains this whole class (or rather 
-		its object) as one of its arguments to actively perform changes to GUI and plot. 
+		Creating threads. The function responsible for scanning and acquiring data obtains this whole class (or rather
+		its object) as one of its arguments to actively perform changes to GUI and plot.
 		"""
 		try:
 			if self.transfer_lock._scan_thread is None:
@@ -3121,7 +3145,7 @@ class TransferCavity:
 			self.transfer_lock._scan_thread.start()
 
 
-	#Method called when the scan is paused/stopped. It also disengages all the locks. 
+	#Method called when the scan is paused/stopped. It also disengages all the locks.
 	def stop_scanning(self):
 
 		self.transfer_lock.stop_scan()
@@ -3145,7 +3169,7 @@ class TransferCavity:
 
 
 #################################################################################################################
-	
+
 """
 The class below takse care of the plotting window. It is divided into 4 plots: the first one plots data acquired from
 the photodetectors and shows the current signals with peaks, the three other plots show real-time error signal of the
@@ -3162,7 +3186,7 @@ class PlotWindow:
 		parent.grid_rowconfigure(0,minsize=2)
 		parent.grid_rowconfigure(2,minsize=2)
 
-		#Plotting frame 
+		#Plotting frame
 		self.plot_frame=Frame(parent,width=610,bg=bg_color)
 		self.plot_frame.grid(row=1,column=1,sticky=NE)
 
@@ -3238,7 +3262,7 @@ class PlotWindow:
 		self.slines=[None,None]
 		for i in range(2):
 			self.slines[i],=self.ax_err_L[i].plot([],[],'w-',lw=1)
-		
+
 
 
 #################################################################################################################
@@ -3273,7 +3297,7 @@ class LaserConnect:
 		self.cfg_label=Label(parent,text="Config settings:",font="Arial 10 bold",bg=bg_color,fg=label_fg_color)
 		self.cfg_label.grid(row=2,column=1,sticky=S)
 
-		#The defualt configuration is chosen initially. 
+		#The defualt configuration is chosen initially.
 		self.cfg_file=StringVar()
 		self.cfg_file.set(os.path.dirname(os.path.realpath(__file__))+"/configs/DEFAULT.ini")
 
@@ -3283,7 +3307,7 @@ class LaserConnect:
 		self.cfg_button=Button(parent,text="Choose config",width=15,font="Arial 10 bold",command=self.dialbox,bg=button_bg_color,fg=label_fg_color)
 		self.cfg_button.grid(row=4,column=1)
 
-		
+
 		self.caught_err=Label(parent,text="",wraplengt=175,bg=bg_color,fg=label_fg_color)
 		self.caught_err.grid(row=10,column=1)
 
@@ -3296,13 +3320,13 @@ class LaserConnect:
 		new_f=filedialog.askopenfilename(initialdir = os.path.dirname(os.path.realpath(__file__))+"/configs",title = "Select file",filetypes = (("config files","*.ini"),))
 		if new_f=="":
 			pass
-		else:	
+		else:
 			self.cfg_file.set(new_f)
 			self.cfg_filename.configure(text=os.path.split(self.cfg_file.get())[1][:-4])
 
 		self.parent.lift()
 
-		
+
 	#Method that's called to initialize the rest of GUI and connect the lasers.
 	def initialize(self,L=None):
 
@@ -3315,14 +3339,17 @@ class LaserConnect:
 			self.config=load_conf(self.cfg_file.get())
 
 			L=connect_lasers()
-			
+
 
 		else:
-			self.lab0.destroy()
-			self.lab1.destroy()
-			self.lab2.destroy()
-			self.las1_opt.destroy()
-			self.las2_opt.destroy()
+			try:
+				self.lab0.destroy()
+				self.lab1.destroy()
+				self.lab2.destroy()
+				self.las1_opt.destroy()
+				self.las2_opt.destroy()
+			except:
+				pass
 
 
 		if len(L)==0:
@@ -3333,6 +3360,7 @@ class LaserConnect:
 
 
 		elif len(L)<3:
+
 			self.caught_err.configure(text="")
 			s=ttk.Style()
 			s.element_create('Plain.Notebook.tab', "from", 'default')
@@ -3342,20 +3370,37 @@ class LaserConnect:
 			s.configure("TNotebook.Tab", background=bg_color, foreground=label_fg_color,font="Arial 10 bold")
 			s.configure('TFrame',background=bg_color,fg=bg_color)
 			tab_ctrl=ttk.Notebook(self.pane,style='TNotebook')
-			
+
 			tabs=[]
 			las=[]
+
+
+			if len(L)>1 and self.config['LASER2']['Name']!='0':
+				if L[0].get_name()==self.config['LASER2']['Name'] or L[1].get_name()==self.config['LASER1']['Name']:
+					L[0],L[1]=L[1],L[0]
+
+
+
+			# for i in range(len(L)):
+			# 	tabs.append(ttk.Frame(tab_ctrl,style='TFrame'))
+			# 	self.add_status(2*i+4,i+1)
 			for i in range(len(L)):
+
 				tabs.append(ttk.Frame(tab_ctrl,style='TFrame'))
-				self.add_status(2*i+4,i+1)
-			for i in range(len(L)):
-				tab_ctrl.add(tabs[i], text="Laser "+str(i+1))
+
+				if self.config['LASER'+str(i+1)]['Name']=='0':
+					tab_ctrl.add(tabs[i], text="Laser "+str(i+1))
+					self.add_status(2*i+4,i+1,"Laser "+str(i+1))
+				else:
+					tab_ctrl.add(tabs[i], text=L[i].get_name())
+					self.add_status(2*i+4,i+1,L[i].get_name())
+
 				try:
 					cfg_wvl=float(self.config['LASER'+str(i+1)]['Wavelength'])
 					las.append(LaserControl(tabs[i],self.status[i],L[i],cfg_wvl))
 				except ValueError:
 					las.append(LaserControl(tabs[i],self.status[i],L[i]))
-			
+
 
 			self.laser_tabs=las #Every laser gets its own tab
 
@@ -3364,56 +3409,67 @@ class LaserConnect:
 			self.con_button.configure(state="disabled")
 
 			pw=PlotWindow(self.plot_frame)
+
 			self.TC=TransferCavity(self.trans_frame,pw,L,self.config,self.sim)
 
 		else:
 			#If there are more than 2 lasers connected to the computer, user has to choose 2 from the list.
 
-			self.caught_err.configure(text="More than two devices \n have been detected. \n Please choose up to 2 \n to connect.")
-			self.con_button.configure(state="disabled")
-
-			self.lab0=Label(self.parent,text="Choose lasers:",font="Arial 10 bold")
-			self.lab0.grid(row=5,column=1)
-			self.lab1=Label(self.parent,text="Laser 1:",font="Arial 10")
-			self.lab1.grid(row=6,column=1,sticky=N)
-			self.lab2=Label(self.parent,text="Laser 2:",font="Arial 10")
-			self.lab2.grid(row=8,column=1,sticky=N)
-
-			self.Llist=[str(l) for l in L]
-			self.Lrem=self.Llist+["None"]
-
-			self.las1=StringVar()
-			self.las1_opt=OptionMenu(self.parent,self.las1,*self.Llist)
-			self.las1_opt.grid(row=6,column=1,sticky=S)
-			self.las1_opt.config(bg=button_bg_color,fg=label_fg_color,font="Arial 10 bold",highlightbackground=bg_color)
-			self.las1.set("None")
-			self.las1.trace("w",self.laser_choice_update)
-
-			self.las2=StringVar()
-			self.las2_opt=OptionMenu(self.parent,self.las2,*self.Lrem)
-			self.las2_opt.grid(row=8,column=1,sticky=S)
-			self.las2.set("None")
-			self.las2_opt.config(state="disabled")
-			self.las2_opt.config(bg=button_bg_color,fg=label_fg_color,font="Arial 10 bold",highlightbackground=bg_color)
-			self.las2.trace("w",self.laser_choice_update)
-
 			self.L_to_connect=[]
-			self.L=L
+			for l in L:
+				if l.get_name()==self.config['LASER2']['Name'] or l.get_name()==self.config['LASER1']['Name']:
+					self.L_to_connect.append(l)
+			if len(self.L_to_connect)>0:
+				self.initialize(L=self.L_to_connect)
+			else:
+				self.caught_err.configure(text="More than two devices \n have been detected. \n Please choose up to 2 \n to connect.")
+				self.con_button.configure(state="disabled")
+
+				self.lab0=Label(self.parent,text="Choose lasers:",font="Arial 10 bold",bg=bg_color)
+				self.lab0.grid(row=5,column=1)
+				self.lab1=Label(self.parent,text="Laser 1:",font="Arial 10",bg=bg_color)
+				self.lab1.grid(row=6,column=1,sticky=N)
+				self.lab2=Label(self.parent,text="Laser 2:",font="Arial 10",bg=bg_color)
+				self.lab2.grid(row=8,column=1,sticky=N)
+
+				self.Llist=[str(l) for l in L]
+				self.Lrem=self.Llist+["None"]
+
+				self.las1=StringVar()
+				self.las1_opt=OptionMenu(self.parent,self.las1,*self.Llist)
+				self.las1_opt.grid(row=6,column=1,sticky=S)
+				self.las1_opt.config(bg=button_bg_color,fg=label_fg_color,font="Arial 10 bold",highlightbackground=bg_color)
+				self.las1.set("None")
+				self.las1.trace("w",self.laser_choice_update)
+
+				self.las2=StringVar()
+				self.las2_opt=OptionMenu(self.parent,self.las2,*self.Lrem)
+				self.las2_opt.grid(row=8,column=1,sticky=S)
+				self.las2.set("None")
+				self.las2_opt.config(state="disabled")
+				self.las2_opt.config(bg=button_bg_color,fg=label_fg_color,font="Arial 10 bold",highlightbackground=bg_color)
+				self.las2.trace("w",self.laser_choice_update)
+
+				self.L=L
 
 
 	#Helper function updating choice lists.
 	def laser_choice_update(self,*args):
 		if self.las1.get()!="None":
+			if self.las1.get()==self.las2.get():
+				self.las2.set("None")
 			self.L_to_connect=[l for l in self.L if str(l)==self.las1.get() or str(l)==self.las2.get()]
 			self.con_button.config(state="normal",command=lambda:self.initialize(L=self.L_to_connect))
 			self.las2_opt.config(state="normal")
-			self.las2.set("None")
+			self.Lrem=[str(l) for l in self.L if str(l)!=self.las1.get()]
+
+
 
 
 	#Helper function creating small indicators
-	def add_status(self,rw,ind):
+	def add_status(self,rw,ind,name):
 
-		cl=Label(self.parent,text="Laser "+str(ind),font="Arial 12 bold",bg=bg_color,fg=label_fg_color)
+		cl=Label(self.parent,text=name,font="Arial 12 bold",bg=bg_color,fg=label_fg_color)
 		cl.grid(row=rw,column=1,sticky=W)
 		cv=Canvas(self.parent,height=30,width=30,bg=bg_color,highlightbackground=bg_color)
 		cv.grid(row=rw,column=1,sticky=E)

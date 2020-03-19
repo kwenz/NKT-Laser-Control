@@ -106,7 +106,10 @@ class DAQ_tasks:
 		for ch in power_channels:
 			self.power_PDs.dq_task.ai_channels.add_ai_voltage_chan(ch)
 
-		self.set_input_timing()
+		try:	
+			self.set_input_timing()
+		except:
+			raise Exception('Input timing was not set.')
 
 
 	#A couple of self-explanatory methods.

@@ -7,7 +7,7 @@ from .Registry import REG
 """
 Classes in this file are responsible for controlling the laser. These are basically
 functions from the provided NKT DLL. The appropriate hex adressess are taken from
-the Registry file. 
+the Registry file.
 """
 
 
@@ -20,7 +20,12 @@ class Laser:
 		self.devID=dev_address
 
 	def __str__(self):
-		return self.port+": device "+self.devID
+		try:
+			name=self.get_name()
+		except:
+			name=''
+
+		return self.port+": device "+str(self.devID)+", "+name
 
 	def get_central_wavelength(self):
 		resc,center=registerReadU32(self.port,self.devID,REG['Wavelength_center'],-1)
@@ -35,7 +40,7 @@ class Laser:
 
 	def get_frequency(self):
 
-		c=299792.458 
+		c=299792.458
 
 		resc,center=registerReadU32(self.port,self.devID,REG['Wavelength_center'],-1)
 		reso,offset=registerReadS16(self.port,self.devID,REG['Current_offset'],-1)
@@ -51,7 +56,7 @@ class Laser:
 
 	def get_set_frequency(self):
 
-		c=299792.458 
+		c=299792.458
 
 		resc,center=registerReadU32(self.port,self.devID,REG['Wavelength_center'],-1)
 		reso,offset=registerReadS16(self.port,self.devID,REG['Wavelength_offset'],-1)
@@ -64,7 +69,7 @@ class Laser:
 		center*=0.0001
 
 		offset=int(round((wavelength-center)*10000))
-		
+
 		if offset>3700:
 			offset=3700
 		elif offset<-3700:
@@ -73,7 +78,7 @@ class Laser:
 		wrRes=registerWriteS16(self.port,self.devID,REG['Wavelength_offset'],offset,-1)
 
 	def set_frequency(self,frequency):
-		c=299792.458 
+		c=299792.458
 		self.set_wavelength(c/frequency)
 
 	def move_frequency(self,deviation):
@@ -89,16 +94,16 @@ class Laser:
 	def get_power(self):
 
 		res,pw=registerReadU16(self.port,self.devID,REG['Output_power'],-1)
-		
+
 		return pw*0.01
 
 	def emission_on(self):
 
-		emR = registerWriteU8(self.port,self.devID, REG['Emission'], 1, -1) 
+		emR = registerWriteU8(self.port,self.devID, REG['Emission'], 1, -1)
 
 	def emission_off(self):
 
-		emR = registerWriteU8(self.port,self.devID, REG['Emission'], 0, -1) 
+		emR = registerWriteU8(self.port,self.devID, REG['Emission'], 0, -1)
 
 	def is_on(self):
 
@@ -121,7 +126,7 @@ class Laser:
 	def get_modulation_type(self):
 		rd,val=registerReadU16(self.port,self.devID,REG['Setup'],-1)
 		val=list('{0:010b}'.format(val))
-		
+
 		if int(val[-2])==0:
 			return "Wide"
 		else:
@@ -132,6 +137,13 @@ class Laser:
 		val='{0:016b}'.format(val)[::-1]
 		val=int(val[-1])
 		return val
+
+	def get_name(self):
+		rd,val=registerReadAscii(self.port,self.devID,REG['Name'],-1)
+		return val.decode('utf-8')
+
+	def write_name(self,name):
+		rd=registerWriteAscii(self.port,self.devID,REG['Name'],name,0,-1)
 
 
 #################################################################################################################
@@ -189,7 +201,7 @@ class Port:
 
 """
 Global functions. First one opens all the ports and creates appropriate objects and returns a list with them.
-The second one first creates devices connected to the ports and then returns list of lasers found amongst the 
+The second one first creates devices connected to the ports and then returns list of lasers found amongst the
 devices at all ports.
 """
 
@@ -204,7 +216,7 @@ def create_ports():
 def connect_lasers():
 
 	openports=create_ports()
-	
+
 	L=[]
 
 	for port in openports:
@@ -213,6 +225,5 @@ def connect_lasers():
 			las=device.make_laser()
 			if las!=0 and las!=None:
 				L.append(las)
-				
-	return L
 
+	return L
